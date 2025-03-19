@@ -9,10 +9,19 @@
 #include <openssl/core.h>
 #include <openssl/provider.h>
 
-static const unsigned char plaintext[] = "Quick Brown Fox Jumps over the Little Lazy Dog";
-static const unsigned char key[] = { 'D', 'E', 'A', 'D', 'B', 'E', 'E', 'F'};
-static unsigned char ciphertext[sizeof(plaintext)];
-static unsigned char plaintext2[sizeof(plaintext)];
+static const unsigned char plaintext[] = "Quick Brown Fox Jumps over the Little Lazy Do";
+static unsigned char key[32];
+static unsigned char iv[32];
+
+static void init_key_iv() 
+{
+    int i;
+
+    for (i = 0; i < 32; i ++)
+        key[i] = iv[i] = i;
+}
+static unsigned char ciphertext[sizeof(plaintext)+1024];
+static unsigned char plaintext2[sizeof(plaintext)+1024];
 
 #define T(e)                                    \
     if (!(e)) {                                 \
@@ -56,25 +65,39 @@ int main()
 {
     OSSL_LIB_CTX *libctx = NULL;
     OSSL_PROVIDER *prov = NULL;
-    EVP_CIPHER *c = NULL;
+    OSSL_PROVIDER *defprov = NULL;
+    EVP_CIPHER *cipher_maria = NULL;
+    EVP_CIPHER *cipher_aria = NULL;
     EVP_CIPHER_CTX *ctx = NULL;
     int outl = 0, outlf = 0;
     int outl2 = 0, outl2f = 0;
     int test = 0;
-  
+
+    init_key_iv();
+    
     // load custom null cipher
     // T((c = EVP_CIPHER_fetch(libctx, "NULL", NULL)) == NULL);
-    printf("Loading nullcipher provider...\n");
-    T((prov = OSSL_PROVIDER_load(libctx, "nullcipher")) != NULL);
-    T((c = EVP_CIPHER_fetch(libctx, "NULL", NULL)) != NULL);
+    printf("Loading ariacipher provider...\n");
+    T((prov = OSSL_PROVIDER_load(libctx, "ariacipher")) != NULL);
+    printf("Loading default provider...\n");
+    T((defprov = OSSL_PROVIDER_load(libctx, "default")) != NULL);
+    T((cipher_maria = EVP_CIPHER_fetch(libctx, "MARIA256", NULL)) != NULL);
+    T((cipher_aria = EVP_CIPHER_fetch(libctx, "ARIA256", NULL)) != NULL);    
     T((ctx = EVP_CIPHER_CTX_new()) != NULL);
+    
+    printf("Encrypting..\n");
     // Encryption
-    T(EVP_CipherInit(ctx, c, NULL, NULL, 1));
+    T(EVP_CipherInit(ctx, cipher_aria, key, iv, 1));
     T(EVP_CipherUpdate(ctx, ciphertext, &outl, plaintext, sizeof(plaintext)));
     T(EVP_CipherFinal(ctx, ciphertext + outl, &outlf));
+    printf("Encrypting %ld bytes to %d bytes (%d)\n", sizeof(plaintext), outl + outlf, ciphertext[outl + outlf]);
+    printf("Ciphertext[%d] = ", outl + outlf);
+    hexdump(ciphertext, outl + outlf);
+    printf("Decrypting..\n");
     // Decryption
-    T(EVP_CipherInit(ctx, NULL, key, NULL, 0));
-    T(EVP_CipherUpdate(ctx, plaintext2, &outl2, ciphertext, outl));
+    T(EVP_CipherInit(ctx, cipher_maria, key, iv, 0));
+    T(EVP_CipherUpdate(ctx, plaintext2, &outl2, ciphertext, outl+outlf));
+    printf("Decrypting %d bytes to %d bytes\n", outl+outlf, outl2);
     T(EVP_CipherFinal(ctx, plaintext2 + outl2, &outl2f));
   
     printf("Plaintext[%zu]  = ", sizeof(plaintext));
@@ -86,18 +109,16 @@ int main()
     printf("Plaintext2[%d] = ", outl2 + outl2f);
     hexdump(plaintext2, outl2 + outl2f);
 
-    printf("Encrypting plaintext should return itself..");
-    TEST_ASSERT(sizeof(plaintext) == outl + outlf
-                && memcmp(plaintext, ciphertext, sizeof(plaintext)) == 0);
-    
-    printf("Decrypting ciphertext should return itself..");
-    TEST_ASSERT(sizeof(plaintext2) == outl2 + outl2f
+    printf("Enc & Decrypting plaintext should return itself.. (%ld, %d)", sizeof(plaintext), outl2+outl2f);
+    TEST_ASSERT(sizeof(plaintext) == outl2 + outl2f
                 && memcmp(plaintext, plaintext2, sizeof(plaintext)) == 0);
 
   
     EVP_CIPHER_CTX_free(ctx);
-    EVP_CIPHER_free(c);
+    EVP_CIPHER_free(cipher_aria);
+    EVP_CIPHER_free(cipher_maria);
     OSSL_PROVIDER_unload(prov);
+    OSSL_PROVIDER_unload(defprov);
 
     return !test;
 }

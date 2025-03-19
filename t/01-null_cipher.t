@@ -4,7 +4,7 @@ use Test2::V0;
 
 plan(1); # run 1 test
 
-my $testname = "01-cipher";
+my $testname = "01-null_cipher";
 my $count;
 
 subtest('null cipher', \&cipher_test,
@@ -35,6 +35,6 @@ sub cipher_test {
     my $deccmd =
         "openssl enc -provider nullcipher -d -null -K $opts{-key} -in $ciphertextfile";
     my $dectext = `$deccmd`;
-    is($?, 0,                                     "decrypting with '$enccmd'");
+    is($?, 0,                                     "decrypting with '$deccmd'");
     is($dectext, $opts{-cleartext}, "decryption result");
 }

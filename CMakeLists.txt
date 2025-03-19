@@ -1,17 +1,18 @@
-# OpenSSL3 Null Cipher Provider
+# OpenSSL3 Simple Cipher Provider
 # 18 Mar 2025, Chul-Woong Yang
 #
 # $ cmake -DCMAKE_PREFIX_PATH=/home/cwyang/.local -S . -B build
 #
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 project(
-  nullcipher-provider
+  simplecipher-provider
   VERSION 0.1
-  DESCRIPTION "OpenSSL 3 Null Cipher Provider"
+  DESCRIPTION "OpenSSL 3 Simple Cipher Provider"
   LANGUAGES C)
 set(CMAKE_C_STANDARD 99)
 
-set(project "nullcipher")
+set(null "nullcipher")
+set(aria "ariacipher")
 set(OPENSSL_ROOT "/home/cwyang/.local")
 
 add_compile_definitions(AUTHOR="@cwyang")
@@ -38,17 +39,29 @@ MESSAGE(DEBUG "OPENSSL_SSL_LIBRARY=${OPENSSL_SSL_LIBRARY}")
 MESSAGE(DEBUG "OPENSSL_SSL_LIBRARIES=${OPENSSL_SSL_LIBRARIES}")
 MESSAGE(DEBUG "OPENSSL_LIBRARIES=${OPENSSL_LIBRARIES}")
 
-# main
-set(sources nullcipher.c)
-add_library(${project} MODULE ${sources})
-set_target_properties(${project} PROPERTIES
-  PREFIX "" OUTPUT_NAME "${project}" SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
-target_compile_definitions(${project} PRIVATE
+# null provider
+set(sources cipher_null.c)
+add_library(${null} MODULE ${sources})
+set_target_properties(${null} PROPERTIES
+  PREFIX "" OUTPUT_NAME "${null}" SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
+target_compile_definitions(${null} PRIVATE
   VERSION="${CMAKE_PROJECT_VERSION}"
   BUILDTYPE="${CMAKE_BUILD_TYPE}"
   )
-target_include_directories(${project} PRIVATE ${OPENSSL_INCLUDE_DIR})
-target_link_libraries(${project} PRIVATE ${libraries})
+target_include_directories(${null} PRIVATE ${OPENSSL_INCLUDE_DIR})
+target_link_libraries(${null} PRIVATE ${libraries})
+
+# aria provider
+set(aria-sources cipher_aria.c)
+add_library(${aria} MODULE ${aria-sources})
+set_target_properties(${aria} PROPERTIES
+  PREFIX "" OUTPUT_NAME "${aria}" SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
+target_compile_definitions(${aria} PRIVATE
+  VERSION="${CMAKE_PROJECT_VERSION}"
+  BUILDTYPE="${CMAKE_BUILD_TYPE}"
+  )
+target_include_directories(${aria} PRIVATE ${OPENSSL_INCLUDE_DIR})
+target_link_libraries(${aria} PRIVATE ${libraries})
 
   
 set(MODULE_DIRECTORY "${CMAKE_BINARY_DIR}")
@@ -69,6 +82,13 @@ add_test(NAME nullcipher
   COMMAND test_nullcipher)
 set_tests_properties(nullcipher PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
 
+add_executable(test_ariacipher test_ariacipher.c)
+target_link_libraries(test_ariacipher PRIVATE OpenSSL::Crypto)
+add_test(NAME ariacipher
+  COMMAND test_ariacipher)
+set_tests_properties(ariacipher PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
 add_test(NAME openssl
   COMMAND prove -PWrapOpenSSL ${CMAKE_CURRENT_SOURCE_DIR}/t)
 set_tests_properties(openssl PROPERTIES ENVIRONMENT "${TEST_ENVIRONMENT}")
+
